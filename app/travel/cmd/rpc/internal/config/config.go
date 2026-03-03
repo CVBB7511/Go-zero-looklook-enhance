@@ -11,4 +11,9 @@ type Config struct {
 		DataSource string
 	}
 	Cache cache.CacheConf
+	// 新增 LocalCache 结构体
+	LocalCache struct {
+		CacheSize int
+		Expire    int
+	}
 }

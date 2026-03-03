@@ -14,7 +14,9 @@ require (
 
 require (
 	github.com/Masterminds/squirrel v1.5.2
+	github.com/coocood/freecache v1.2.5
 	github.com/golang-module/carbon/v2 v2.0.1
+	golang.org/x/sync v0.19.0
 )
 
 require (
