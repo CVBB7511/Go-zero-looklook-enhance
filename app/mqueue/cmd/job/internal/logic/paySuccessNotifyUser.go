@@ -2,14 +2,18 @@ package logic
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"time"
+
+	// 优化：替换标准库 encoding/json 为 jsoniter (高性能)
 	"github.com/golang-module/carbon/v2"
 	"github.com/hibiken/asynq"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/pkg/errors"
 	"github.com/silenceper/wechat/v2/miniprogram/subscribe"
 	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/core/service"
+
 	"looklook/app/mqueue/cmd/job/internal/svc"
 	"looklook/app/mqueue/cmd/job/jobtype"
 	"looklook/app/order/model"
@@ -19,10 +23,12 @@ import (
 	"looklook/pkg/tool"
 	"looklook/pkg/wxminisub"
 	"looklook/pkg/xerr"
-	"time"
 )
 
 var ErrPaySuccessNotifyFail = xerr.NewErrMsg("pay success notify user fail")
+
+// 优化：初始化 jsoniter
+var jsonParser = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // PaySuccessNotifyUserHandler pay success notify user
 type PaySuccessNotifyUserHandler struct {
@@ -36,10 +42,16 @@ func NewPaySuccessNotifyUserHandler(svcCtx *svc.ServiceContext) *PaySuccessNotif
 }
 
 func (l *PaySuccessNotifyUserHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
+	// 优化：从 sync.Pool 中获取对象，避免每次产生临时结构体导致 GC
+	p := jobtype.PaySuccessNotifyUserPayloadPool.Get().(*jobtype.PaySuccessNotifyUserPayload)
+	defer func() {
+		p.Reset() // 清理数据，防止被下一次借出时复用脏数据
+		jobtype.PaySuccessNotifyUserPayloadPool.Put(p)
+	}()
 
-	var p jobtype.PaySuccessNotifyUserPayload
-	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return errors.Wrapf(ErrPaySuccessNotifyFail, "PaySuccessNotifyUserHandler payload err:%v, payLoad:%+v", err, t.Payload())
+	// 使用 jsoniter 提升反序列化性能
+	if err := jsonParser.Unmarshal(t.Payload(), p); err != nil {
+		return errors.Wrapf(ErrPaySuccessNotifyFail, "PaySuccessNotifyUserHandler payload err:%v, payLoad:%+v", err, string(t.Payload()))
 	}
 
 	// 1、get user openid

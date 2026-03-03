@@ -1,0 +1,14 @@
+{
+    "id": "EV-2018022511223320873",
+    "create_time": "2015-05-20T13:29:35+08:00",
+    "resource_type": "encrypt-resource",
+    "event_type": "TRANSACTION.SUCCESS",
+    "summary": "支付成功",
+    "resource": {
+        "original_type": "transaction",
+        "algorithm": "AEAD_AES_256_GCM",
+        "ciphertext": "这是一段模拟的加密密文数据，在实际业务中会更长一点用来模拟内存分配压力...",
+        "associated_data": "transaction",
+        "nonce": "86AB14"
+    }
+}
