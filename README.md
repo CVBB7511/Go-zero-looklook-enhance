@@ -1,10 +1,10 @@
 
 
-## 原版go-zero-looklook说明
+## I 原版go-zero-looklook说明
 
 English | [简体中文](README-cn.md)
 
-### 改进方向二：多级缓存防击穿与热点数据并发控制
+## II 改进思路：多级缓存防击穿与热点数据并发控制
 
 秒杀场景的核心是“读多写少”。简单的 Redis 缓存无法应对瞬间数十万 QPS 的热点数据请求（例如某一款爆款商品的库存查询），这会造成网络带宽打满或 Redis 节点 CPU 飙升。
 
@@ -52,7 +52,7 @@ English | [简体中文](README-cn.md)
 
 ---
 
-### 总结与你的“改进方案”对比
+## III 与原版的对比
 
 原版的 `go-zero-looklook` 做到了 **“框架兜底的标准化高并发保护”**，应付一般的互联网流量绰绰有余。
 
@@ -64,7 +64,8 @@ English | [简体中文](README-cn.md)
 因此，向面试官阐述时，你可以明确表示：“**原版项目依赖 go-zero 底层保护了 DB，但我在此基础上，通过 L1 缓存和外层 singleflight 保护了 Redis 并消除了网络开销，完成了从‘一般高并发’到‘极致高并发’的架构演进。**”
 针对多级缓存、防止缓存击穿以及基于 `sync.Pool` 的内存优化，在 `go-zero-looklook` 项目中，你可以重点修改以下几个模块的文件。这些修改不仅契合高并发场景，也非常贴合字节跳动支付等核心交易链路对极致性能（尤其是 GC 和内存控制）的要求。
 
-### 一、 引入 Local Cache (L1) + Redis (L2) 与 Singleflight
+## IV 修改的具体方案
+### 改进一具体方案、 引入 Local Cache (L1) + Redis (L2) 与 Singleflight
 
 在秒杀或爆款场景中，读请求通常集中在商品或服务详情上。在这个项目中，“民宿详情（Homestay Detail）”是最典型的“读多写少”且易产生热点数据的业务。
 
@@ -92,7 +93,100 @@ English | [简体中文](README-cn.md)
 * **修改内容**：在 `HomestayDetail` 方法中，当 L1 缓存未命中，需要穿透到 Redis 甚至 MySQL 时，引入 `golang.org/x/sync/singleflight`。
 * **实现逻辑**：实例化一个全局的 `singleflight.Group`。当大量请求同时发现 L1 缓存失效，针对同一个 `id`，使用 `group.Do(id, func() (interface{}, error) { ... })` 将并发请求合并。只有第一个 Goroutine 会去请求底层数据并回填 L1 缓存，其余 Goroutine 直接共享结果。
 
+### 压力测试
+压力测试方案：
+```
+Summary:
+  Total:        1.3456 secs
+  Slowest:      0.1415 secs
+  Fastest:      0.0010 secs
+  Average:      0.0311 secs
+  Requests/sec: 14863.1963
 
+  Total data:   9860000 bytes
+  Size/request: 493 bytes
+
+Response time histogram:
+  0.001 [1]     |
+  0.015 [2861]  |■■■■■■■■■■■■■■
+  0.029 [8035]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.043 [5079]  |■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.057 [2421]  |■■■■■■■■■■■■
+  0.071 [899]   |■■■■
+  0.085 [427]   |■■
+  0.099 [188]   |■
+  0.113 [73]    |
+  0.127 [13]    |
+  0.142 [3]     |
+
+
+Latency distribution:
+  10% in 0.0125 secs
+  25% in 0.0189 secs
+  50% in 0.0273 secs
+  75% in 0.0394 secs
+  90% in 0.0539 secs
+  95% in 0.0653 secs
+  99% in 0.0928 secs
+
+Details (average, fastest, slowest):
+  DNS+dialup:   0.0000 secs, 0.0010 secs, 0.1415 secs
+  DNS-lookup:   0.0000 secs, 0.0000 secs, 0.0000 secs
+  req write:    0.0001 secs, 0.0000 secs, 0.0509 secs
+  resp wait:    0.0294 secs, 0.0009 secs, 0.1181 secs
+  resp read:    0.0008 secs, 0.0000 secs, 0.0513 secs
+
+Status code distribution:
+  [200] 20000 responses
+```
+```
+hey -n 20000 -c 500 -m POST -T "application/json" -D req.json http://127.0.0.1:1003/travel/v1/homestay/homestayDetail
+```
+压力测试结果
+```
+Summary:
+  Total:        1.3456 secs
+  Slowest:      0.1415 secs
+  Fastest:      0.0010 secs
+  Average:      0.0311 secs
+  Requests/sec: 14863.1963
+
+  Total data:   9860000 bytes
+  Size/request: 493 bytes
+
+Response time histogram:
+  0.001 [1]     |
+  0.015 [2861]  |■■■■■■■■■■■■■■
+  0.029 [8035]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.043 [5079]  |■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.057 [2421]  |■■■■■■■■■■■■
+  0.071 [899]   |■■■■
+  0.085 [427]   |■■
+  0.099 [188]   |■
+  0.113 [73]    |
+  0.127 [13]    |
+  0.142 [3]     |
+
+
+Latency distribution:
+  10% in 0.0125 secs
+  25% in 0.0189 secs
+  50% in 0.0273 secs
+  75% in 0.0394 secs
+  90% in 0.0539 secs
+  95% in 0.0653 secs
+  99% in 0.0928 secs
+
+Details (average, fastest, slowest):
+  DNS+dialup:   0.0000 secs, 0.0010 secs, 0.1415 secs
+  DNS-lookup:   0.0000 secs, 0.0000 secs, 0.0000 secs
+  req write:    0.0001 secs, 0.0000 secs, 0.0509 secs
+  resp wait:    0.0294 secs, 0.0009 secs, 0.1181 secs
+  resp read:    0.0008 secs, 0.0000 secs, 0.0513 secs
+
+Status code distribution:
+  [200] 20000 responses
+```
 
 ### 二、 使用 `sync.Pool` 进行内存对象复用
 

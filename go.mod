@@ -8,15 +8,15 @@ require (
 	github.com/jinzhu/copier v0.3.2
 	github.com/pkg/errors v0.9.1
 	github.com/sony/sonyflake v1.0.0
-	google.golang.org/grpc v1.65.0
+	google.golang.org/grpc v1.65.0-dev
 	google.golang.org/protobuf v1.35.1
 )
 
 require (
 	github.com/Masterminds/squirrel v1.5.2
-	github.com/coocood/freecache v1.2.5
+	github.com/coocood/freecache v1.2.4
 	github.com/golang-module/carbon/v2 v2.0.1
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.6.0
 )
 
 require (
@@ -59,10 +59,10 @@ require (
 	github.com/openzipkin/zipkin-go v0.4.3 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
-	github.com/prometheus/client_golang v1.20.5 // indirect
+	github.com/prometheus/client_golang v1.19.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.55.0 // indirect
-	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/prometheus/common v0.54.0 // indirect
+	github.com/prometheus/procfs v0.13.0 // indirect
 	github.com/redis/go-redis/v9 v9.7.0 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/segmentio/kafka-go v0.4.38 // indirect
@@ -87,13 +87,13 @@ require (
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/net v0.30.0 // indirect
+	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
 	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/term v0.25.0 // indirect
-	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/text v0.15.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240711142825-46eb208f015d // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240513163218-0867130af1f8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -118,6 +118,6 @@ require (
 	github.com/silenceper/wechat/v2 v2.0.9
 	github.com/wechatpay-apiv3/wechatpay-go v0.2.9
 	github.com/zeromicro/go-queue v1.1.8
-	github.com/zeromicro/go-zero v1.7.3
-	golang.org/x/crypto v0.28.0 // indirect
+	github.com/zeromicro/go-zero v1.6.5
+	golang.org/x/crypto v0.23.0 // indirect
 )
