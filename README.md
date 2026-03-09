@@ -11,7 +11,7 @@ English | [简体中文](README-cn.md)
 **具体修改方案：**
 
 1. **引入 Local Cache (L1) + Redis (L2)：**
-* 使用 `freecache` 或 `bigcache` 在 Go 进程内存中建立本地缓存。这类库的底层实现避免了大量指针，从而极大降低了 Go 的 GC（垃圾回收）扫描压力。这直接呼应了你对底层内存管理和 Page Fault 的理解。
+* 使用 `freecache` 或 `bigcache` 在 Go 进程内存中建立本地缓存。这类库的底层实现避免了大量指针，从而极大降低了 Go 的 GC（垃圾回收）扫描压力。底层内存管理和 Page Fault。
 * 查询库存时，先查本地缓存，未命中再查 Redis，最后才查 MySQL。
 
 
@@ -29,11 +29,11 @@ English | [简体中文](README-cn.md)
 
 对于**防缓存击穿与热点数据并发控制**，原版项目也没有在 Logic 业务层手写相关代码，而是**隐式地利用了 `go-zero` 框架在 Model 数据层的自动化处理**。
 
-具体来说，原版的处理方式如下：
+原版的处理方式如下：
 
 ### 1. 依靠底层 `SharedCalls` 防缓存击穿（自带的 singleflight）
 
-如果你查看原版项目中由 `goctl` 生成的模型代码（例如 `app/travel/model/homestayModel_gen.go` 中的 `FindOne` 方法），你会发现它底层调用了 `go-zero` 的 `sqlc.CachedConn.QueryRow()`。
+原版项目中由 `goctl` 生成的模型代码（例如 `app/travel/model/homestayModel_gen.go` 中的 `FindOne` 方法），它底层调用了 `go-zero` 的 `sqlc.CachedConn.QueryRow()`。
 
 * **底层机制**：在 `go-zero` 框架内部，`QueryRow` 方法包装了 `syncx.SharedCalls` 组件（这是 `go-zero` 自己实现的一个 `singleflight`）。
 * **并发控制效果**：当某一个热点民宿的 Redis 缓存失效时，如果有 10 万个并发请求同时涌入试图查询这个 ID，底层的 `SharedCalls` 会以对应的 Cache Key 为锁，**合并这些并发请求**。最终只会有 1 个 Goroutine 穿透去查询 MySQL 并回填 Redis，另外 99999 个请求会在原地阻塞，等待这 1 次查询的结果并直接共享，从而保护了 MySQL 不被打挂。
@@ -56,12 +56,10 @@ English | [简体中文](README-cn.md)
 
 原版的 `go-zero-looklook` 做到了 **“框架兜底的标准化高并发保护”**，应付一般的互联网流量绰绰有余。
 
-**但是，为什么你之前设计的“改进方向二（Local Cache + 业务层 singleflight）”依然极其有价值？**
-
 1. **突破 Redis 的网络与单点瓶颈**：原版即使有底层的防击穿保护，几十万 QPS 的读请求依然全量打到了 Redis。对于字节跳动级别的大促或秒杀，这会瞬间打满 Redis 集群的网卡带宽。你引入 `freecache` (L1) 后，99% 的热点读流量被挡在了 Go 进程内存里，省去了网络 I/O。
 2. **保护 Redis 本身**：原版底层的 `SharedCalls` 是在 Redis 未命中、**去查 MySQL 时**才触发合并的，它保护的是 MySQL。而你在 Logic 层自己套一层 `singleflight`，是在 L1 缓存未命中、**去查 Redis 时**合并请求，这进一步保护了 Redis 免受瞬间高并发的冲击。
 
-因此，向面试官阐述时，你可以明确表示：“**原版项目依赖 go-zero 底层保护了 DB，但我在此基础上，通过 L1 缓存和外层 singleflight 保护了 Redis 并消除了网络开销，完成了从‘一般高并发’到‘极致高并发’的架构演进。**”
+“**原版项目依赖 go-zero 底层保护了 DB，但我在此基础上，通过 L1 缓存和外层 singleflight 保护了 Redis 并消除了网络开销，完成了从‘一般高并发’到‘极致高并发’的架构演进。**”
 针对多级缓存、防止缓存击穿以及基于 `sync.Pool` 的内存优化，在 `go-zero-looklook` 项目中，你可以重点修改以下几个模块的文件。这些修改不仅契合高并发场景，也非常贴合字节跳动支付等核心交易链路对极致性能（尤其是 GC 和内存控制）的要求。
 
 ## IV 修改的具体方案
@@ -192,7 +190,7 @@ Status code distribution:
 
 在高并发支付链路中，支付网关的回调、消息队列的积压处理以及统一的 HTTP 返回封装是产生大量临时对象（导致 GC 停顿）的重灾区。
 
-建议修改以下文件：
+我修改了以下文件：
 
 **1. 支付回调网关解析（支付岗核心关注点）**
 
@@ -221,12 +219,8 @@ Status code distribution:
 
 
 ### 总结实施路径
-
-针对你的面试准备，你可以按照以下步骤去提交代码（Commit）：
-
 1. 在 `travel` 模块中实现并测试 **L1 + L2 + Singleflight** 的查询链路，压测对比 QPS 和 Redis 命中率。
 2. 在 `payment` 模块的微信回调 Handler 中引入 **`sync.Pool`**，通过 `pprof` 抓取并对比修改前后的 heap 对象分配数量和 GC 耗时。
-将这两点形成量化数据写进简历，是非常契合大厂支付/交易核心系统开发方向的亮点。
 ## Thanks
 
 go-zero: https://github.com/zeromicro/go-zero
